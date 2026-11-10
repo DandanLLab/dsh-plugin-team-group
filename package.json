@@ -1,0 +1,24 @@
+{
+  "name": "dsh-plugin-team-group",
+  "version": "0.1.0",
+  "description": "团队群聊：角色卡（各挂预设/人格/模型）+ 群组 + 导演发言规划器 + 逐角色执行引擎，SSE 实时流。Operit2 角色群组架构的 dsh 落地。",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "ui", "cordis.patch.yml", "README.md"],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-slots"]
+    }
+  }
+}

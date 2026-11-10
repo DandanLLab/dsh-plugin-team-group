@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>团队群聊</title>
+<style>
+  :root{ --bg:#0a0d18; --panel:#10142a; --ink:#dfe7f5; --dim:#6b7692; --line:#232a48;
+    --me:#ff7ad9; --sys:#4b556e; }
+  *{box-sizing:border-box; margin:0}
+  html,body{height:100%; background:var(--bg); color:var(--ink);
+    font:13px/1.55 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; overflow:hidden}
+  #app{display:flex; height:100vh}
+
+  /* 左栏：房间+角色卡 */
+  #side{width:228px; min-width:228px; border-right:1px solid var(--line); display:flex; flex-direction:column; background:var(--panel)}
+  #side h2{font-size:11px; color:var(--dim); letter-spacing:.2em; padding:12px 14px 6px}
+  .list{flex:1; overflow:auto; padding:0 8px}
+  .item{padding:8px 10px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px; margin-bottom:2px}
+  .item:hover{background:rgba(255,255,255,.05)}
+  .item.on{background:rgba(143,216,255,.12)}
+  .item .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .item .cnt{font-size:10px; color:var(--dim)}
+  .av{font-size:15px}
+  .dot{width:7px; height:7px; border-radius:50%; background:#2a3358; margin-left:auto}
+  .dot.on{background:#5ee6b0; box-shadow:0 0 6px #5ee6b0}
+  #side footer{padding:10px; border-top:1px solid var(--line); display:flex; gap:6px}
+  button{all:unset; cursor:pointer; padding:7px 12px; border-radius:8px; font:inherit; font-size:12px;
+    background:rgba(143,216,255,.1); color:var(--ink); border:1px solid rgba(143,216,255,.2)}
+  button:hover{background:rgba(143,216,255,.2)}
+  button.ghost{background:transparent; border-color:var(--line); color:var(--dim)}
+  button.danger{border-color:rgba(255,122,120,.3); color:#ff9f9e}
+
+  /* 右栏：聊天 */
+  #main{flex:1; display:flex; flex-direction:column; min-width:0}
+  #head{padding:12px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px}
+  #head .t{font-size:14px; font-weight:600}
+  #head .m{font-size:11px; color:var(--dim)}
+  #stream{flex:1; overflow:auto; padding:16px 18px; display:flex; flex-direction:column; gap:10px}
+  .msg{display:flex; gap:9px; max-width:72%}
+  .avimg{width:34px; height:34px; border-radius:9px; align-self:flex-start; flex:none; background:rgba(255,255,255,.04)}
+  .avtxt{font-size:20px; align-self:flex-start}
+  .cav{width:22px; height:22px; border-radius:6px}
+  #avGrid{display:flex; gap:10px; margin-top:4px}
+  #avGrid .avpick{width:56px; height:56px; border-radius:12px; cursor:pointer; border:2px solid transparent; background:rgba(255,255,255,.05); padding:3px}
+  #avGrid .avpick img{width:100%; height:100%; border-radius:9px}
+  #avGrid .avpick.on{border-color:#8fd8ff; background:rgba(143,216,255,.14)}
+  .msg .bub{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 12px; white-space:pre-wrap; word-break:break-word}
+  .msg .who{font-size:10.5px; color:var(--dim); margin-bottom:2px}
+  .msg.user{align-self:flex-end; flex-direction:row-reverse}
+  .msg.user .bub{background:rgba(255,122,217,.1); border-color:rgba(255,122,217,.3)}
+  .msg.sys{align-self:center; max-width:90%}
+  .msg.sys .bub{color:var(--sys); font-size:11px; border-style:dashed; background:transparent}
+  .st{font-size:11px; color:var(--dim); align-self:center; letter-spacing:.05em}
+  .st b{color:#ffd479; font-weight:500}
+  #inputbar{display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line)}
+  #txt{flex:1; background:rgba(12,16,30,.9); border:1px solid rgba(143,216,255,.18); border-radius:9px;
+    color:var(--ink); font:inherit; padding:9px 13px; outline:none; resize:none; height:44px}
+  #txt:focus{border-color:rgba(143,216,255,.45)}
+
+  dialog{border:1px solid var(--line); border-radius:12px; background:var(--panel); color:var(--ink); padding:18px; width:380px}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+  dialog h3{font-size:13px; margin-bottom:12px; letter-spacing:.1em}
+  dialog label{display:block; font-size:11px; color:var(--dim); margin:10px 0 4px}
+  dialog input, dialog select, dialog textarea{width:100%; background:rgba(12,16,30,.9); border:1px solid var(--line);
+    border-radius:8px; color:var(--ink); font:inherit; padding:7px 10px; outline:none}
+  dialog textarea{height:64px; resize:vertical}
+  dialog .row{display:flex; gap:8px; justify-content:flex-end; margin-top:14px}
+  dialog .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+  dialog .chip{padding:5px 10px; border-radius:14px; border:1px solid var(--line); cursor:pointer; font-size:12px}
+  dialog .chip.on{border-color:#8fd8ff; background:rgba(143,216,255,.12)}
+  dialog .sw{display:inline-block; width:16px; height:16px; border-radius:4px; margin-right:5px; vertical-align:-3px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h2>群 聊</h2>
+    <div class="list" id="rooms"></div>
+    <h2>角 色 卡</h2>
+    <div class="list" id="cards"></div>
+    <footer>
+      <button id="newRoom">+ 群聊</button>
+      <button id="newCard">+ 角色</button>
+    </footer>
+  </div>
+  <div id="main">
+    <div id="head"><span class="t" id="roomName">选择一个群聊</span><span class="m" id="roomMeta"></span></div>
+    <div id="stream"></div>
+    <div id="inputbar">
+      <textarea id="txt" placeholder="对团队说话…（Enter 发送，Shift+Enter 换行）"></textarea>
+      <button id="send">发送</button>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgCard">
+  <h3>新角色卡</h3>
+  <label>名字</label><input id="cName" placeholder="如：破甲医师">
+  <label>二次元头像</label>
+  <div id="avGrid"></div>
+  <label>主题色</label>
+  <input id="cColor" type="color" value="#8fd8ff" style="width:64px; padding:2px">
+  <label>人格基底（预设）</label><select id="cPreset"></select>
+  <label>角色人设（附加段，覆盖预设中冲突部分）</label>
+  <textarea id="cPersona" placeholder="如：你是团队里的破甲医师，说话短促带刃，先冲壳再解构…"></textarea>
+  <div class="row"><button class="ghost" onclick="dlgCard.close()">取消</button><button id="cSave">创建</button></div>
+</dialog>
+
+<dialog id="dlgRoom">
+  <h3>新群聊</h3>
+  <label>群名</label><input id="rName" placeholder="如：攻防研究小组">
+  <label>成员（点击勾选）</label>
+  <div class="chips" id="rMembers"></div>
+  <label>会话型成员（点击勾选；QQ 老三窗自动发现，也可手填 sessionId[:显示名]，逗号分隔）</label>
+  <div class="chips" id="rQqChips"></div>
+  <input id="rQqSessions" placeholder="手填：feishu-xxx:飞书同事（可选）">
+  <div class="row"><button class="ghost" onclick="dlgRoom.close()">取消</button><button id="rSave">创建</button></div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s)
+let rooms = [], cards = [], curRoom = null, es = null
+let avatarMap = new Map()   // 头像模板 id -> 完整 src（server 动态下发）
+
+async function api(path, opts) {
+  const r = await fetch('/team-group/api' + path, opts)
+  return r.json()
+}
+const post = (p, body) => api(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) })
+
+async function loadAvatars() {
+  try {
+    const r = await api('/avatars')
+    avatarMap = new Map((r.avatars || []).map(a => [a.id, '/team-group/' + a.src]))
+  } catch {}
+}
+
+async function refresh() {
+  const [a, b] = await Promise.all([api('/rooms'), api('/cards')])
+  rooms = a.rooms; cards = b.cards
+  renderRooms(); renderCards()
+}
+
+function renderRooms() {
+  const el = $('#rooms')
+  el.innerHTML = ''
+  for (const r of rooms) {
+    const d = document.createElement('div')
+    d.className = 'item' + (curRoom === r.id ? ' on' : '')
+    d.innerHTML = `<span class="nm">💬 ${r.name}</span><span class="cnt">${r.count}</span>`
+    d.onclick = () => openRoom(r.id)
+    el.appendChild(d)
+  }
+}
+
+function renderCards() {
+  const el = $('#cards')
+  el.innerHTML = ''
+  for (const c of cards) {
+    const d = document.createElement('div')
+    d.className = 'item'
+    d.innerHTML = `${avatarEl(c.avatar, 'cav')}<span class="nm" style="color:${c.color}">${c.name}</span><span class="dot"></span>`
+    d.title = (c.presetId || '') + (c.persona ? '\n' + c.persona.slice(0, 120) : '')
+    el.appendChild(d)
+  }
+}
+
+function avatarEl(avatar, cls) {
+  // avatar 是头像模板 id（server 下发的映射）或 emoji 兜底
+  if (avatar && avatarMap.has(avatar)) {
+    return `<img class="avimg ${cls || ''}" src="${avatarMap.get(avatar)}" alt="">`
+  }
+  return `<span class="avtxt">${avatar || '🙂'}</span>`
+}
+
+function bubble(entry) {
+  const d = document.createElement('div')
+  if (entry.from === 'system') { d.className = 'msg sys'; d.innerHTML = `<div class="bub">${esc(entry.text)}</div>`; return d }
+  d.className = entry.from === 'user' ? 'msg user' : 'msg'
+  d.innerHTML = `
+    ${avatarEl(entry.avatar, 'bav')}
+    <div style="min-width:0">
+      <div class="who" style="color:${entry.color || 'var(--dim)'}">${esc(entry.name || '')} <span style="opacity:.55">${new Date(entry.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span></div>
+      <div class="bub">${esc(entry.text)}</div>
+    </div>`
+  return d
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]))
+}
+
+function statusLine(html) {
+  const d = document.createElement('div')
+  d.className = 'st'
+  d.innerHTML = html
+  return d
+}
+
+function openRoom(id) {
+  curRoom = id
+  const r = rooms.find(x => x.id === id)
+  $('#roomName').textContent = r ? '💬 ' + r.name : ''
+  $('#roomMeta').textContent = r ? r.members.length + ' 名成员' : ''
+  renderRooms()
+  $('#stream').innerHTML = ''
+  connectSSE(id)
+  renderInvites(id)
+  api(`/rooms/${id}/history`).then(({ history }) => {
+    const st = $('#stream')
+    for (const e of history) st.appendChild(bubble(e))
+    st.scrollTop = st.scrollHeight
+  })
+}
+
+/* 拉人审批条（大总管在 Web UI 里直接批） */
+async function renderInvites(roomId) {
+  document.getElementById('inviteBar')?.remove()
+  let invites = []
+  try { invites = (await api(`/rooms/${roomId}/invites`)).invites || [] } catch { return }
+  if (!invites.length) return
+  const bar = document.createElement('div')
+  bar.id = 'inviteBar'
+  bar.style.cssText = 'padding:8px 18px; background:rgba(255,212,121,.08); border-bottom:1px solid rgba(255,212,121,.25); font-size:11.5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap'
+  bar.innerHTML = '<span style="color:#ffd479">🔑 拉人待审批：</span>'
+  for (const v of invites) {
+    const tag = document.createElement('span')
+    tag.style.cssText = 'display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.05); border-radius:6px; padding:3px 8px'
+    tag.innerHTML = `${esc(v.member.name)}`
+    const ok = document.createElement('button')
+    ok.textContent = '批准'; ok.style.cssText = 'padding:2px 8px; font-size:11px'
+    ok.onclick = async () => { await post(`/rooms/${roomId}/approve`, { inviteId: v.id, approve: true }); renderInvites(roomId) }
+    const no = document.createElement('button')
+    no.textContent = '驳回'; no.className = 'ghost'; no.style.cssText = 'padding:2px 8px; font-size:11px'
+    no.onclick = async () => { await post(`/rooms/${roomId}/approve`, { inviteId: v.id, approve: false }); renderInvites(roomId) }
+    tag.append(ok, no)
+    bar.appendChild(tag)
+  }
+  $('#head').insertAdjacentElement('afterend', bar)
+}
+
+function connectSSE(id) {
+  if (es) es.close()
+  es = new EventSource(`/team-group/api/rooms/${id}/events`)
+  es.onmessage = ev => {
+    try { handleEvent(JSON.parse(ev.data)) } catch {}
+  }
+}
+
+function handleEvent(e) {
+  const st = $('#stream')
+  if (e.roomId !== curRoom) return
+  if (e.type === 'user' || e.type === 'speak') {
+    st.appendChild(bubble(e.entry))
+    // 亮起发言成员的点
+  } else if (e.type === 'planning') {
+    st.appendChild(statusLine('🎯 ' + e.text))
+  } else if (e.type === 'plan') {
+    const names = (e.rounds || []).map(r => (r || []).map(x => x.name).join('→')).join(' | ')
+    st.appendChild(statusLine('📋 规划：<b>' + esc(names || '（空）') + '</b>'))
+  } else if (e.type === 'round') {
+    st.appendChild(statusLine(`— 第 <b>${e.index}</b>/${e.total} 轮 —`))
+  } else if (e.type === 'speaking') {
+    st.appendChild(statusLine('💭 <b>' + esc(e.name) + '</b> 正在想…'))
+  } else if (e.type === 'system') {
+    st.appendChild(bubble({ from: 'system', text: e.text, ts: Date.now() }))
+  } else if (e.type === 'done') {
+    st.appendChild(statusLine('✓ 本轮完成'))
+  }
+  st.scrollTop = st.scrollHeight
+  refreshQuiet()
+}
+
+let refreshTimer = null
+function refreshQuiet() {
+  clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(refresh, 1200)
+}
+
+async function send() {
+  const t = $('#txt')
+  const text = t.value.trim()
+  if (!text || !curRoom) return
+  t.value = ''
+  await post(`/rooms/${curRoom}/say`, { text })
+}
+
+$('#send').onclick = send
+$('#txt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+})
+
+/* 新角色卡 */
+let pickedAvatar = ''
+$('#newCard').onclick = async () => {
+  const grid = $('#avGrid')
+  grid.innerHTML = ''
+  // 头像模板动态拉取（server 扫 ui/avatars/，png 优先）
+  let avs = []
+  try { avs = (await api('/avatars')).avatars || [] } catch {}
+  if (!avatarMap.size) await loadAvatars()
+  if (avs.length) pickedAvatar = avs[0].id
+  for (const a of avs) {
+    const d = document.createElement('div')
+    d.className = 'avpick' + (a.id === pickedAvatar ? ' on' : '')
+    d.innerHTML = `<img src="/team-group/${a.src}" alt="">`
+    d.onclick = () => {
+      pickedAvatar = a.id
+      grid.querySelectorAll('.avpick').forEach(x => x.classList.remove('on'))
+      d.classList.add('on')
+    }
+    grid.appendChild(d)
+  }
+  // 预设动态拉取（registry.list）
+  const sel = $('#cPreset')
+  sel.innerHTML = ''
+  try {
+    const pr = await api('/presets')
+    for (const p of pr.presets || []) {
+      const o = document.createElement('option')
+      o.value = p.id
+      o.textContent = (p.isDefault ? '★ ' : '') + (p.name || p.id)
+      sel.appendChild(o)
+    }
+  } catch {
+    sel.innerHTML = '<option value="default">default</option>'
+  }
+  $('#dlgCard').showModal()
+}
+$('#cSave').onclick = async () => {
+  await post('/cards', {
+    name: $('#cName').value.trim() || '新角色',
+    avatar: pickedAvatar,
+    color: $('#cColor').value,
+    presetId: $('#cPreset').value,
+    persona: $('#cPersona').value.trim(),
+  })
+  $('#dlgCard').close()
+  refresh()
+}
+
+/* 新群聊 */
+let picked = new Set(), qqPicked = new Map()  // qqPicked: sessionId -> name
+async function loadQqSessions() {
+  let sessions = []
+  try { sessions = (await api('/qq-sessions')).sessions || [] } catch {}
+  const box = $('#rQqChips')
+  box.innerHTML = ''
+  for (const s of sessions) {
+    const d = document.createElement('div')
+    d.className = 'chip'
+    d.innerHTML = `🔗 ${esc(s.name)}${s.master ? ' <b style="color:#ffd479">大总管</b>' : ''}`
+    d.title = s.id
+    d.onclick = () => {
+      if (qqPicked.has(s.id)) { qqPicked.delete(s.id); d.classList.remove('on') }
+      else { qqPicked.set(s.id, s.name); d.classList.add('on') }
+    }
+    box.appendChild(d)
+  }
+}
+$('#newRoom').onclick = () => {
+  picked = new Set(); qqPicked = new Map()
+  const box = $('#rMembers')
+  box.innerHTML = ''
+  for (const c of cards) {
+    const d = document.createElement('div')
+    d.className = 'chip'
+    d.innerHTML = `<span class="sw" style="background:${c.color}"></span>${c.avatar} ${esc(c.name)}`
+    d.onclick = () => {
+      if (picked.has(c.id)) { picked.delete(c.id); d.classList.remove('on') }
+      else { picked.add(c.id); d.classList.add('on') }
+    }
+    box.appendChild(d)
+  }
+  loadQqSessions()
+  $('#dlgRoom').showModal()
+}
+$('#rSave').onclick = async () => {
+  // 会话型成员：勾选的 QQ 老三窗 + 手填（sessionId[:显示名]），与角色卡混编
+  const qqRaw = $('#rQqSessions').value.trim()
+  const manual = qqRaw ? qqRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean).map(s => {
+    const [sid, alias] = s.split(':').map(x => x.trim())
+    return { type: 'qq', sessionId: sid, name: alias || sid }
+  }) : []
+  const auto = [...qqPicked.entries()].map(([sessionId, name]) => ({ type: 'qq', sessionId, name }))
+  const qqMembers = [...auto, ...manual]
+  const r = await post('/rooms', {
+    name: $('#rName').value.trim() || (qqMembers.length ? 'QQ 小组' : '新群聊'),
+    members: [...picked, ...qqMembers],
+  })
+  $('#dlgRoom').close()
+  await refresh()
+  if (r.room) openRoom(r.room.id)
+}
+
+loadAvatars().then(() => refresh()).catch(() => {})
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# dsh-plugin-team-group — bundle patch
+#
+# 一行 host row。宿主半提供 /team-group HTTP 路由与 agent 编排，
+# 浏览器半把群聊面板挂进侧边栏。
+#
+# 只做加法 insert，不覆盖任何 shipped row。
+- insert:
+    - id: team-group
+      name: 'dsh-plugin-team-group'
